@@ -206,7 +206,7 @@ impl AstBuilder {
                     unreachable!()
                 };
 
-                Operand::Memory(Box::new(address))
+                Operand::Memory(Rc::new(address))
             }
         }
     }
@@ -245,7 +245,7 @@ impl Operands {
 enum Operand {
     Instruction(Rc<Instruction>),
     Register(u32),
-    Memory(Box<Self>),
+    Memory(Rc<Self>),
     Imm8(u8),
     Imm16(u16),
     Imm32(u32),

@@ -9,3 +9,8 @@ edition = "2021"
 anyhow = "1.0.68"
 goblin = { version = "0.6.0", default-features = false, features = ["pe32", "pe64", "std"] }
 iced-x86 = { version = "1.18.0", default-features = false, features = ["std", "decoder", "instr_info"] }
+
+[profile.release]
+debug = true
+lto = true
+panic = "abort"
