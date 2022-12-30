@@ -46,7 +46,7 @@ fn main() -> Result<()> {
 }
 
 struct AstBuilder {
-    instructions: Vec<Rc<Instruction>>,
+    instructions: Vec<Instruction>,
 }
 
 impl AstBuilder {
@@ -67,10 +67,10 @@ impl AstBuilder {
         let dst = Self::get_operand_ast(inst, 0);
         let src = Self::get_operand_ast(inst, 1);
 
-        let parent = Rc::new(Instruction {
+        let parent = Instruction {
             operands: Operands::two(dst.clone(), src.clone()),
             kind: InstructionKind::BvAdd,
-        });
+        };
 
         // self.add_carry_flag(inst, Rc::clone(&parent), dst, src);
 
@@ -145,7 +145,7 @@ impl AstBuilder {
             ),
         );
 
-        self.instructions.push(Rc::new(node));
+        self.instructions.push(node);
     }
 
     fn get_operand_ast(inst: x86Instruction, idx: u32) -> Operand {
