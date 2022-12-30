@@ -24,7 +24,7 @@ fn main() -> Result<()> {
 
     let decoder = Decoder::with_ip(64, &bytes, 0x1234_5678, 0);
 
-    let mut ast_builder = AstBuilder::new();
+    let mut ast_builder = AstBuilder::with_capacity(bytes.len() / 2);
 
     // let decoder = iced_x86::Decoder::new(64, instructions, 0);
     for inst in decoder {
@@ -50,9 +50,9 @@ struct AstBuilder {
 }
 
 impl AstBuilder {
-    pub fn new() -> Self {
+    pub fn with_capacity(n: usize) -> Self {
         Self {
-            instructions: Vec::new(),
+            instructions: Vec::with_capacity(n),
         }
     }
 
