@@ -24,7 +24,7 @@ fn main() -> Result<()> {
 
     let decoder = Decoder::with_ip(64, &bytes, 0x1234_5678, 0);
 
-    let mut ast_builder = AstBuilder::with_capacity(bytes.len() / 2);
+    let mut ast_builder = AstBuilder::with_capacity(bytes.len());
 
     // let decoder = iced_x86::Decoder::new(64, instructions, 0);
     for inst in decoder {
@@ -49,10 +49,13 @@ struct AstBuilder {
     instructions: Vec<Instruction>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct InstructionIdx(u32);
+
 impl AstBuilder {
     pub fn with_capacity(n: usize) -> Self {
         Self {
-            instructions: Vec::with_capacity(n),
+            instructions: Vec::with_capacity(n * 4),
         }
     }
 
@@ -63,27 +66,33 @@ impl AstBuilder {
         }
     }
 
+    fn intern_instruction(&mut self, inst: Instruction) -> InstructionIdx {
+        let idx = self.instructions.len();
+        self.instructions.push(inst);
+        InstructionIdx(idx as u32)
+    }
+
     fn add_add(&mut self, inst: x86Instruction) {
         let dst = Self::get_operand_ast(inst, 0);
         let src = Self::get_operand_ast(inst, 1);
 
-        let parent = Instruction {
-            operands: Operands::two(dst.clone(), src.clone()),
+        let parent = self.intern_instruction(Instruction {
+            operands: Operands::two(dst, src),
             kind: InstructionKind::BvAdd,
-        };
+        });
 
-        // self.add_carry_flag(inst, Rc::clone(&parent), dst, src);
-
-        self.instructions.push(parent)
+        self.add_carry_flag(inst, parent, dst, src);
     }
 
     fn add_carry_flag(
         &mut self,
         inst: x86Instruction,
-        parent: Rc<Instruction>,
+        parent: InstructionIdx,
         op1: Operand,
         op2: Operand,
     ) {
+        self.instructions.reserve(8);
+
         let low = Operand::Imm64(0);
         let high = Operand::Imm64(0);
 
@@ -92,60 +101,53 @@ impl AstBuilder {
         // MSB((op1 & op2) ^ ((op1 ^ op2 ^ parent) & (op1 ^ op2)))
 
         // (op1 ^ op2)
-        let a = Instruction::new(
+        let a = self.intern_instruction(Instruction::new(
             InstructionKind::BvXor,
-            Operands::two(op1.clone(), op2.clone()),
-        );
+            Operands::two(op1, op2),
+        ));
         // parent
-        let b = Instruction::new(
+        let b = self.intern_instruction(Instruction::new(
             InstructionKind::Extract,
             Operands::three(low, high, Operand::Instruction(parent)),
-        );
+        ));
 
         // (op1 ^ op2 ^ parent)
-        let c = Instruction::new(
+        let c = self.intern_instruction(Instruction::new(
             InstructionKind::BvXor,
-            Operands::two(
-                Operand::Instruction(Rc::new(a)),
-                Operand::Instruction(Rc::new(b)),
-            ),
-        );
+            Operands::two(Operand::Instruction(a), Operand::Instruction(b)),
+        ));
         // (op1 ^ op2)
-        let d = Instruction::new(
+        let d = self.intern_instruction(Instruction::new(
             InstructionKind::BvXor,
-            Operands::two(op1.clone(), op2.clone()),
-        );
+            Operands::two(op1, op2),
+        ));
 
         // ((op1 ^ op2 ^ parent) & (op1 ^ op2))
-        let e = Instruction::new(
+        let e = self.intern_instruction(Instruction::new(
             InstructionKind::BvAnd,
-            Operands::two(
-                Operand::Instruction(Rc::new(c)),
-                Operand::Instruction(Rc::new(d)),
-            ),
-        );
+            Operands::two(Operand::Instruction(c), Operand::Instruction(d)),
+        ));
         // (op1 & op2)
-        let f = Instruction::new(InstructionKind::BvAnd, Operands::two(op1, op2));
+        let f = self.intern_instruction(Instruction::new(
+            InstructionKind::BvAnd,
+            Operands::two(op1, op2),
+        ));
 
         // (op1 & op2) ^ ((op1 ^ op2 ^ parent) & (op1 ^ op2))
-        let g = Instruction::new(
+        let g = self.intern_instruction(Instruction::new(
             InstructionKind::BvXor,
-            Operands::two(
-                Operand::Instruction(Rc::new(e)),
-                Operand::Instruction(Rc::new(f)),
-            ),
-        );
+            Operands::two(Operand::Instruction(e), Operand::Instruction(f)),
+        ));
 
-        let node = Instruction::new(
+        let node = self.intern_instruction(Instruction::new(
             InstructionKind::Extract,
             Operands::three(
                 Operand::Imm64(bit_size - 1),
                 Operand::Imm64(bit_size - 1),
-                Operand::Instruction(Rc::new(g)),
+                Operand::Instruction(g),
             ),
-        );
-
-        self.instructions.push(node);
+        ));
+        // self.instructions.push(node);
     }
 
     fn get_operand_ast(inst: x86Instruction, idx: u32) -> Operand {
@@ -241,9 +243,9 @@ impl Operands {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 enum Operand {
-    Instruction(Rc<Instruction>),
+    Instruction(InstructionIdx),
     Register(u32),
     Memory(u32),
     Imm8(u8),
