@@ -193,7 +193,7 @@ impl AstBuilder {
                 };
 
                 let address = if base_reg != Register::None {
-                    Operand::Register(base_reg as u32)
+                    base_reg as u32
                 } else if index != Register::None {
                     //     var offset = scaleValue == 1 ? new RegisterNode(index) : astCtxt.bvmul(astCtxt.bv(scaleValue, bitSize), new RegisterNode(index));
                     //     address = astCtxt.bvadd(address, offset);
@@ -206,7 +206,7 @@ impl AstBuilder {
                     unreachable!()
                 };
 
-                Operand::Memory(Rc::new(address))
+                Operand::Memory(address)
             }
         }
     }
@@ -245,7 +245,7 @@ impl Operands {
 enum Operand {
     Instruction(Rc<Instruction>),
     Register(u32),
-    Memory(Rc<Self>),
+    Memory(u32),
     Imm8(u8),
     Imm16(u16),
     Imm32(u32),
