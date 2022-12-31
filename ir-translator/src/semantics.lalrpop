@@ -1,0 +1,157 @@
+use std::{str::FromStr, collections::HashMap};
+use iced_x86::Mnemonic;
+use crate::generator::{Expr, Flag, BinOp, UnaryOp, InstSemantics, InstDefinition};
+// use crate::{Case, When, WhenClause, Field, WhenBody, CaseClause, BitAccess};
+
+grammar;
+
+match {
+    // symbols
+    "=>",
+    "{",
+    "}",
+    ",",
+    "(",
+    ")",
+    "+",
+    "-",
+    "&",
+    "|",
+    "^",
+    ";",
+
+    // flags
+    "flags:",
+    "adjust",
+    "carry",
+    "overflow",
+    "parity",
+    "sign",
+    "zero",
+
+    // operands
+    r"op[0-4]",
+
+    r"\{\{[^\}]+\}\}",
+    
+    // functions
+    "zx",
+    "bit_size",
+    
+    // mnemonics
+    "ADC",
+    "ADD",
+    "SUB",
+    "LEA",
+    
+    r"(\+|-)?[0-9]+",
+    // r"[A-Z]+",
+
+    // Skip whitespace and comments
+    r"\s*" => { },
+    r"//[^\n\r]*[\n\r]*" => { }, // `// comment`
+}
+
+Comma<T>: Vec<T> = { // (1)
+    <mut v:(<T> ",")*> <e:T?> => match e { // (2)
+        Some(e) => {
+            v.push(e);
+            v
+        },
+        None => v,
+    }
+};
+
+Mnemonic: Mnemonic = {
+    "ADC" => Mnemonic::Adc,
+    "ADD" => Mnemonic::Add,
+    "SUB" => Mnemonic::Sub,
+    "LEA" => Mnemonic::Lea,
+}
+
+Int: i64 = {
+    r"(\+|-)?[0-9]+" => i64::from_str(<>).unwrap(),
+};
+
+Flag: Flag = {
+    "adjust" => Flag::Adjust,
+    "carry" => Flag::Carry,
+    "overflow" => Flag::Overflow,
+    "parity" => Flag::Parity,
+    "sign" => Flag::Sign,
+    "zero" => Flag::Zero,
+}
+
+FlagList: Vec<Flag> = {
+    "flags:" <flags:Comma<Flag>> => flags,
+}
+
+TwoArgs: Vec<Expr> = {
+    "(" <arg1:Expr> "," <arg2:Expr> ")" => vec![arg1, arg2],
+}
+
+Expr: Expr = {
+    <e1:Expr> "+" <e2:Factor> => Expr::BinaryOp {
+        lhs: Box::new(e1),
+        op: BinOp::Add,
+        rhs: Box::new(e2),
+    },
+    <e1:Expr> "-" <e2:Factor> => Expr::BinaryOp {
+        lhs: Box::new(e1),
+        op: BinOp::Sub,
+        rhs: Box::new(e2),
+    },
+    Factor,
+}
+
+Factor: Expr = {
+    Function,
+    Term,
+}
+
+Interpolation: String = {
+    r"\{\{[^\}]+\}\}" => <>.trim_start_matches("{{").trim_end_matches("}}").to_owned(),
+}
+
+Term: Expr = {
+    r"op[0-4]" => Expr::Operand(u8::from_str(<>.trim_start_matches("op")).unwrap()),
+    "(" <e:Expr> ")" => Expr::Paren(Box::new(e)),
+    <int:Interpolation> => Expr::Interpolation(int),
+    <i:Int> => Expr::Int(i),
+    <f:Flag> => Expr::Register(f),
+}
+
+Function: Expr = {
+    "zx" <args:TwoArgs> => Expr::BinaryOp {
+        lhs: Box::new(args[0].clone()),
+        op: BinOp::Zx,
+        rhs: Box::new(args[1].clone()),
+    },
+    "bit_size" "(" <e:Expr> ")" => Expr::UnaryOp(UnaryOp::BitSize, Box::new(e)),
+}
+
+InstSemantics: InstSemantics = {
+    "{" <expr:Expr> ";" <flags:FlagList> "}" => InstSemantics { expr, interpolation: None, flags },
+    "{" <expr:Expr> ";" <interpolation:Interpolation> <flags:FlagList> "}" => {
+        InstSemantics { expr, interpolation: Some(interpolation), flags }
+    },
+}
+
+InstDefinition: InstDefinition = {
+    <name:Mnemonic> "=>" "{" <impls:Comma<I>> "}" => {
+        let implementations = impls.into_iter().collect();
+        InstDefinition {
+            name, implementations
+        }
+    }
+}
+
+// // "{" <num_args:Int> "=>" 
+
+I: (u8, InstSemantics) = {
+    <i:Int> "=>" <sem:InstSemantics> => (i as u8, sem),
+}
+
+pub InstDefinitions: Vec<InstDefinition> = {
+    <defs:Comma<InstDefinition>> => defs,
+}

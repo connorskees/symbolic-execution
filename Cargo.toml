@@ -1,14 +1,17 @@
-[package]
-name = "symb"
-version = "0.1.0"
-edition = "2021"
+[workspace]
+# [package]
+# name = "symb"
+# version = "0.1.0"
+# edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[dependencies]
-anyhow = "1.0.68"
-goblin = { version = "0.6.0", default-features = false, features = ["pe32", "pe64", "std"] }
-iced-x86 = { version = "1.18.0", default-features = false, features = ["std", "decoder", "instr_info"] }
+members = [
+    "ir-translator",
+    "symb",
+    "ir",
+    "engine",
+]
 
 [profile.release]
 debug = true

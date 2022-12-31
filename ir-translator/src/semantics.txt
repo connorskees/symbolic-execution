@@ -1,0 +1,33 @@
+ADC => {
+    2 => {
+        (op0 + op1) + zx(bit_size(op0) - 1, carry);
+
+        flags: //adjust, carry, overflow, parity, sign, zero
+    }
+},
+
+ADD => {
+    2 => {
+        op0 + op1;
+
+        {{ ABC }}
+
+        flags: //adjust, carry, overflow, parity, sign, zero
+    }
+},
+
+SUB => {
+    2 => {
+        op0 - op1;
+
+        flags: //adjust, carry, overflow, parity, sign, zero
+    }
+}
+
+LEA => {
+    2 => {
+        op0 - op1;
+
+        flags: //adjust, carry, overflow, parity, sign, zero
+    }
+}
